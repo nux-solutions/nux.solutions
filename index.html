@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Nux Solutions</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
+            body {
+                font-family: "Arial", sans-serif;
+                background: #1a1a2e;
+                color: #fff;
+                overflow: hidden;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+            }
+
+            .container {
+                text-align: center;
+                z-index: 10;
+                position: relative;
+                pointer-events: none;
+            }
+
+            h1 {
+                font-size: 3rem;
+                margin-bottom: 1rem;
+                text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+                animation: glow 3s ease-in-out infinite alternate;
+            }
+
+            @keyframes glow {
+                from {
+                    text-shadow:
+                        2px 2px 4px rgba(0, 0, 0, 0.8),
+                        0 0 20px rgba(255, 255, 255, 0.3);
+                }
+                to {
+                    text-shadow:
+                        2px 2px 4px rgba(0, 0, 0, 0.8),
+                        0 0 30px rgba(255, 255, 255, 0.6),
+                        0 0 40px rgba(100, 200, 255, 0.4);
+                }
+            }
+
+            canvas {
+                position: fixed;
+                top: 0;
+                left: 0;
+                z-index: 1;
+                /* cursor: none; */
+            }
+
+            .links {
+                margin-top: 2rem;
+                pointer-events: auto;
+            }
+
+            .links a {
+                color: #fff;
+                text-decoration: none;
+                margin: 0 1rem;
+                padding: 0.5rem 1rem;
+                border: 1px solid rgba(255, 255, 255, 0.4);
+                border-radius: 5px;
+                transition: all 0.3s ease;
+                backdrop-filter: blur(10px);
+                background: rgba(0, 0, 0, 0.3);
+            }
+
+            .links a:hover {
+                background: rgba(255, 255, 255, 0.1);
+                border-color: rgba(255, 255, 255, 0.8);
+                box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+            }
+        </style>
+    </head>
+    <body>
+        <canvas id="fluidCanvas"></canvas>
+
+        <div class="container">
+            <h1>Nux Solutions</h1>
+            <div class="links">
+                <a href="mailto:jz@nux.solutions">Contact</a>
+            </div>
+        </div>
+
+        <script src="https://lytc.github.io/chipmunk-js/cp.min.js"></script>
+        <script>
+            const canvas = document.getElementById("fluidCanvas");
+            const ctx = canvas.getContext("2d");
+
+            // Set canvas size
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            const colors = [
+                "#ff6b6b",
+                "#4ecdc4",
+                "#45b7d1",
+                "#96ceb4",
+                "#ffeaa7",
+                "#dda0dd",
+                "#98d8c8",
+                "#f7dc6f",
+                "#bb8fce",
+                "#85c1e9",
+            ];
+
+            // Initialize Chipmunk physics
+            const space = new cp.Space();
+            space.gravity = cp.v(0, 600); // Positive for canvas coordinates
+            cp.enableSegmentToSegmentCollisions();
+
+            // Track shapes for rendering
+            const shapes = [];
+            let colorIndex = 0;
+
+            // Helper function to get next color
+            function getNextColor() {
+                const color = colors[colorIndex % colors.length];
+                colorIndex++;
+                return color;
+            }
+
+            // Create rotating box container
+            const rogueBoxBody = new cp.Body(Infinity, Infinity);
+            rogueBoxBody.setAngVel(0.4);
+
+            // Box vertices
+            const boxSize = 200;
+            const a = cp.v(-boxSize, -boxSize);
+            const b = cp.v(-boxSize, boxSize);
+            const c = cp.v(boxSize, boxSize);
+            const d = cp.v(boxSize, -boxSize);
+
+            // Add box segments
+            const boxSegments = [
+                [a, b],
+                [b, c],
+                [c, d],
+                [d, a],
+            ];
+
+            boxSegments.forEach(([start, end]) => {
+                const shape = space.addShape(
+                    new cp.SegmentShape(rogueBoxBody, start, end, 0.0),
+                );
+                shape.setElasticity(1.0);
+                shape.setFriction(1.0);
+                shapes.push({ shape, color: "#ffffff", isStatic: true });
+            });
+
+            // Helper functions for adding shapes
+            function addBox(pos, mass, width, height) {
+                const body = space.addBody(
+                    new cp.Body(mass, cp.momentForBox(mass, width, height)),
+                );
+                body.setPos(pos);
+
+                const shape = space.addShape(
+                    new cp.BoxShape(body, width, height),
+                );
+                shape.setElasticity(0.0);
+                shape.setFriction(0.7);
+                shapes.push({ shape, color: getNextColor(), body });
+            }
+
+            function addSegment(pos, mass, width, height) {
+                const body = space.addBody(
+                    new cp.Body(mass, cp.momentForBox(mass, width, height)),
+                );
+                body.setPos(pos);
+
+                const shape = space.addShape(
+                    new cp.SegmentShape(
+                        body,
+                        cp.v(0.0, (height - width) / 2.0),
+                        cp.v(0.0, (width - height) / 2.0),
+                        width / 2.0,
+                    ),
+                );
+                shape.setElasticity(0.0);
+                shape.setFriction(0.7);
+                shapes.push({ shape, color: getNextColor(), body });
+            }
+
+            function addCircle(pos, mass, radius) {
+                const body = space.addBody(
+                    new cp.Body(
+                        mass,
+                        cp.momentForCircle(mass, 0.0, radius, cp.vzero),
+                    ),
+                );
+                body.setPos(pos);
+
+                const shape = space.addShape(
+                    new cp.CircleShape(body, radius, cp.vzero),
+                );
+                shape.setElasticity(0.0);
+                shape.setFriction(0.7);
+                shapes.push({ shape, color: getNextColor(), body });
+            }
+
+            // Add tumbling shapes
+            const mass = 1;
+            const width = 30;
+            const height = width * 2;
+
+            for (let i = 0; i < 7; i++) {
+                for (let j = 0; j < 3; j++) {
+                    const pos = cp.v(i * width - 150, j * height - 150);
+                    const type = Math.floor(Math.random() * 3);
+
+                    if (type === 0) {
+                        addBox(pos, mass, width, height);
+                    } else if (type === 1) {
+                        addSegment(pos, mass, width, height);
+                    } else {
+                        addCircle(
+                            cp.v.add(pos, cp.v(0.0, (height - width) / 2.0)),
+                            mass,
+                            width / 2.0,
+                        );
+                        addCircle(
+                            cp.v.add(pos, cp.v(0.0, (width - height) / 2.0)),
+                            mass,
+                            width / 2.0,
+                        );
+                    }
+                }
+            }
+
+            // Drawing functions
+            function drawSegment(ctx, shape, color) {
+                const a = shape.ta;
+                const b = shape.tb;
+
+                ctx.beginPath();
+                ctx.moveTo(a.x, a.y);
+                ctx.lineTo(b.x, b.y);
+
+                if (shape.r > 0) {
+                    // Draw thick segment with rounded ends
+                    ctx.lineWidth = shape.r * 2;
+                    ctx.lineCap = "round";
+                }
+
+                ctx.strokeStyle = color;
+                ctx.globalAlpha = 0.5;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.globalAlpha = 1.0;
+            }
+
+            function drawCircle(ctx, shape, body, color) {
+                const pos = body.p;
+
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, shape.r, 0, Math.PI * 2);
+
+                ctx.strokeStyle = color;
+                ctx.globalAlpha = 0.5;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.globalAlpha = 1.0;
+            }
+
+            function drawBox(ctx, shape, body, color) {
+                const pos = body.p;
+                const rot = body.a;
+
+                ctx.save();
+                ctx.translate(pos.x, pos.y);
+                ctx.rotate(rot);
+
+                // BoxShape vertices are stored as an array
+                const verts = shape.verts;
+
+                ctx.beginPath();
+                if (verts && verts.length > 0) {
+                    ctx.moveTo(verts[0], verts[1]);
+                    for (let i = 2; i < verts.length; i += 2) {
+                        ctx.lineTo(verts[i], verts[i + 1]);
+                    }
+                    ctx.closePath();
+                }
+
+                ctx.strokeStyle = color;
+                ctx.globalAlpha = 0.5;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.globalAlpha = 1.0;
+
+                ctx.restore();
+            }
+
+            // Animation loop
+            let lastTime = 0;
+            const dt = 1 / 60;
+
+            function animate(currentTime) {
+                // Update physics
+                rogueBoxBody.updatePosition(dt);
+                space.step(dt);
+
+                // Clear canvas
+                ctx.fillStyle = "#1a1a2e";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Center the view
+                ctx.save();
+                ctx.translate(canvas.width / 2, canvas.height / 2);
+
+                // Draw all shapes
+                shapes.forEach(({ shape, color, body, isStatic }) => {
+                    if (shape instanceof cp.SegmentShape) {
+                        drawSegment(ctx, shape, color);
+                    } else if (shape instanceof cp.CircleShape) {
+                        drawCircle(ctx, shape, body || shape.body, color);
+                    } else if (shape instanceof cp.PolyShape) {
+                        drawBox(ctx, shape, body || shape.body, color);
+                    }
+                });
+
+                ctx.restore();
+
+                requestAnimationFrame(animate);
+            }
+
+            // Handle window resize
+            window.addEventListener("resize", () => {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            });
+
+            // Start animation
+            requestAnimationFrame(animate);
+        </script>
+    </body>
+</html>
