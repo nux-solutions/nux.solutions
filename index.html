@@ -116,7 +116,7 @@
 
             // Initialize Chipmunk physics
             const space = new cp.Space();
-            space.gravity = cp.v(0, 600); // Positive for canvas coordinates
+            space.gravity = cp.v(0, 400); // Positive for canvas coordinates
             cp.enableSegmentToSegmentCollisions();
 
             // Track shapes for rendering
@@ -134,20 +134,24 @@
             const rogueBoxBody = new cp.Body(Infinity, Infinity);
             rogueBoxBody.setAngVel(0.4);
 
-            // Box vertices
+            // Octagon vertices
             const boxSize = 200;
-            const a = cp.v(-boxSize, -boxSize);
-            const b = cp.v(-boxSize, boxSize);
-            const c = cp.v(boxSize, boxSize);
-            const d = cp.v(boxSize, -boxSize);
+            const vertices = [];
+            const numSides = 8;
 
-            // Add box segments
-            const boxSegments = [
-                [a, b],
-                [b, c],
-                [c, d],
-                [d, a],
-            ];
+            // Generate octagon vertices
+            for (let i = 0; i < numSides; i++) {
+                const angle = (i * 2 * Math.PI) / numSides - Math.PI / 8; // Rotate by π/8 to align flat edge at top
+                vertices.push(
+                    cp.v(boxSize * Math.cos(angle), boxSize * Math.sin(angle)),
+                );
+            }
+
+            // Create segments connecting the vertices
+            const boxSegments = [];
+            for (let i = 0; i < numSides; i++) {
+                boxSegments.push([vertices[i], vertices[(i + 1) % numSides]]);
+            }
 
             boxSegments.forEach(([start, end]) => {
                 const shape = space.addShape(
