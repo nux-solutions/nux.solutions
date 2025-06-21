@@ -155,7 +155,12 @@
                 );
                 shape.setElasticity(1.0);
                 shape.setFriction(1.0);
-                shapes.push({ shape, color: "#ffffff", isStatic: true });
+                shapes.push({
+                    shape,
+                    color: "#ffffff",
+                    isStatic: true,
+                    type: "segment",
+                });
             });
 
             // Helper functions for adding shapes
@@ -170,7 +175,14 @@
                 );
                 shape.setElasticity(0.0);
                 shape.setFriction(0.7);
-                shapes.push({ shape, color: getNextColor(), body });
+                shapes.push({
+                    shape,
+                    color: getNextColor(),
+                    body,
+                    type: "box",
+                    width,
+                    height,
+                });
             }
 
             function addSegment(pos, mass, width, height) {
@@ -189,7 +201,12 @@
                 );
                 shape.setElasticity(0.0);
                 shape.setFriction(0.7);
-                shapes.push({ shape, color: getNextColor(), body });
+                shapes.push({
+                    shape,
+                    color: getNextColor(),
+                    body,
+                    type: "segment",
+                });
             }
 
             function addCircle(pos, mass, radius) {
@@ -206,7 +223,12 @@
                 );
                 shape.setElasticity(0.0);
                 shape.setFriction(0.7);
-                shapes.push({ shape, color: getNextColor(), body });
+                shapes.push({
+                    shape,
+                    color: getNextColor(),
+                    body,
+                    type: "circle",
+                });
             }
 
             // Add tumbling shapes
@@ -242,15 +264,53 @@
             function drawSegment(ctx, shape, color) {
                 const a = shape.ta;
                 const b = shape.tb;
+                const r = shape.r;
 
-                ctx.beginPath();
-                ctx.moveTo(a.x, a.y);
-                ctx.lineTo(b.x, b.y);
+                if (r > 0) {
+                    // Calculate direction and perpendicular vectors
+                    const dx = b.x - a.x;
+                    const dy = b.y - a.y;
+                    const len = Math.sqrt(dx * dx + dy * dy);
 
-                if (shape.r > 0) {
-                    // Draw thick segment with rounded ends
-                    ctx.lineWidth = shape.r * 2;
-                    ctx.lineCap = "round";
+                    if (len > 0) {
+                        // Normalized perpendicular vector
+                        const px = (-dy / len) * r;
+                        const py = (dx / len) * r;
+
+                        ctx.beginPath();
+
+                        // Start at one edge of point a
+                        ctx.moveTo(a.x + px, a.y + py);
+
+                        // Arc around point a
+                        ctx.arc(
+                            a.x,
+                            a.y,
+                            r,
+                            Math.atan2(py, px),
+                            Math.atan2(-py, -px),
+                        );
+
+                        // Line to corresponding edge at point b
+                        ctx.lineTo(b.x - px, b.y - py);
+
+                        // Arc around point b
+                        ctx.arc(
+                            b.x,
+                            b.y,
+                            r,
+                            Math.atan2(-py, -px),
+                            Math.atan2(py, px),
+                        );
+
+                        // Close the path
+                        ctx.closePath();
+                    }
+                } else {
+                    // Fallback for zero-radius segment
+                    ctx.beginPath();
+                    ctx.moveTo(a.x, a.y);
+                    ctx.lineTo(b.x, b.y);
                 }
 
                 ctx.strokeStyle = color;
@@ -273,7 +333,7 @@
                 ctx.globalAlpha = 1.0;
             }
 
-            function drawBox(ctx, shape, body, color) {
+            function drawBox(ctx, shape, body, color, width, height) {
                 const pos = body.p;
                 const rot = body.a;
 
@@ -281,17 +341,8 @@
                 ctx.translate(pos.x, pos.y);
                 ctx.rotate(rot);
 
-                // BoxShape vertices are stored as an array
-                const verts = shape.verts;
-
                 ctx.beginPath();
-                if (verts && verts.length > 0) {
-                    ctx.moveTo(verts[0], verts[1]);
-                    for (let i = 2; i < verts.length; i += 2) {
-                        ctx.lineTo(verts[i], verts[i + 1]);
-                    }
-                    ctx.closePath();
-                }
+                ctx.rect(-width / 2, -height / 2, width, height);
 
                 ctx.strokeStyle = color;
                 ctx.globalAlpha = 0.5;
@@ -320,15 +371,24 @@
                 ctx.translate(canvas.width / 2, canvas.height / 2);
 
                 // Draw all shapes
-                shapes.forEach(({ shape, color, body, isStatic }) => {
-                    if (shape instanceof cp.SegmentShape) {
-                        drawSegment(ctx, shape, color);
-                    } else if (shape instanceof cp.CircleShape) {
-                        drawCircle(ctx, shape, body || shape.body, color);
-                    } else if (shape instanceof cp.PolyShape) {
-                        drawBox(ctx, shape, body || shape.body, color);
-                    }
-                });
+                shapes.forEach(
+                    ({ shape, color, body, isStatic, type, width, height }) => {
+                        if (type === "segment") {
+                            drawSegment(ctx, shape, color);
+                        } else if (type === "circle") {
+                            drawCircle(ctx, shape, body || shape.body, color);
+                        } else if (type === "box") {
+                            drawBox(
+                                ctx,
+                                shape,
+                                body || shape.body,
+                                color,
+                                width,
+                                height,
+                            );
+                        }
+                    },
+                );
 
                 ctx.restore();
 
